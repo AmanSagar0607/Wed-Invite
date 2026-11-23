@@ -11,7 +11,12 @@ export function getDb() {
   }
 
   if (!pool) {
-    pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
+    const connectionUrl = new URL(process.env.DATABASE_URL);
+    const sslMode = connectionUrl.searchParams.get("sslmode");
+    if (["prefer", "require", "verify-ca"].includes(sslMode ?? "")) {
+      connectionUrl.searchParams.set("sslmode", "verify-full");
+    }
+    pool = new Pool({ connectionString: connectionUrl.toString(), max: 5 });
     client = drizzle(pool, { schema });
   }
 

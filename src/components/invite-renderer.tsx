@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import Image from "next/image";
 import { ChevronDown, Copy, Feather, Flower2, Heart, Minus, Music2, Pause, Phone, Share2 } from "lucide-react";
@@ -11,6 +11,9 @@ import { EventCard } from "@/components/event-card";
 import { GalleryCarousel } from "@/components/gallery-carousel";
 import { RsvpForm } from "@/components/rsvp-form";
 import { ScratchHeart } from "@/components/scratch-heart";
+import { EnvelopeIntro } from "@/components/envelope-intro";
+import { ElephantPair } from "@/components/elephant-pair";
+import { LoveDivider } from "@/components/love-divider";
 import { InviteMotionLayer } from "@/components/wedding-atmosphere";
 
 function backgroundValue(value: string) {
@@ -26,24 +29,33 @@ function formatWeddingDate(date: string) {
   return new Intl.DateTimeFormat("en", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(value);
 }
 
-function Hero({ invite, onStartMusic }: { invite: InviteData; onStartMusic: () => void }) {
+function HeroArtwork({ invite }: { invite: InviteData }) {
   const sampleInvitationFilm = invite.heroVideo === "/wedding.mp4";
   const heroVideo = sampleInvitationFilm ? "" : invite.heroVideo;
-  const hasMedia = Boolean(invite.heroImage || heroVideo);
   const illustratedTheme = invite.theme.id === "rajasthani-rose";
+
+  if (heroVideo) {
+    return <div className="hero-artwork"><video src={heroVideo} poster={invite.heroImage || undefined} autoPlay muted loop playsInline aria-label={`${invite.couple.bride} and ${invite.couple.groom} wedding film`} /></div>;
+  }
+  if (invite.heroImage) {
+    return <div className="hero-artwork"><Image src={invite.heroImage} alt={`${invite.couple.bride} and ${invite.couple.groom} wedding photo`} fill sizes="(max-width: 760px) 92vw, 780px" priority unoptimized /></div>;
+  }
+  if (!illustratedTheme) return null;
+
   return (
-    <section className={`invite-hero${hasMedia ? " has-media" : ""}`} id="hero">
-      {heroVideo && <video className="invite-hero-media" src={heroVideo} poster={invite.heroImage || undefined} autoPlay muted loop playsInline aria-hidden="true" />}
-      {!invite.heroVideo && invite.heroImage && <Image className="invite-hero-media" src={invite.heroImage} alt="" fill sizes="100vw" priority unoptimized />}
-      {hasMedia && <div className="invite-hero-overlay" />}
-      {illustratedTheme && <>
-        <div className="hero-arch-art" data-parallax="arch" aria-hidden="true">
-          <div className="hero-arch-half hero-arch-left"><Image src="/wedding/hero-arch-v2.webp" alt="" width={1264} height={848} sizes="100vw" priority /></div>
-          <div className="hero-arch-half hero-arch-right"><Image src="/wedding/hero-arch-v2.webp" alt="" width={1264} height={848} sizes="100vw" priority /></div>
-        </div>
-        <span className="hero-lantern hero-lantern-left" aria-hidden="true"><i /></span>
-        <span className="hero-lantern hero-lantern-right" aria-hidden="true"><i /></span>
-      </>}
+    <div className="hero-artwork hero-arch-art" data-parallax="arch" aria-hidden="true">
+      <Image src="/wedding/hero-arch-v2.webp" alt="" width={1264} height={848} sizes="(max-width: 760px) 96vw, 840px" priority />
+      <span className="hero-lantern hero-lantern-left" aria-hidden="true"><i /></span>
+      <span className="hero-lantern hero-lantern-right" aria-hidden="true"><i /></span>
+    </div>
+  );
+}
+
+function Hero({ invite, onStartMusic }: { invite: InviteData; onStartMusic: () => void }) {
+  const hasMedia = Boolean(invite.heroImage || invite.heroVideo);
+  return (
+    <section className={`invite-hero${hasMedia ? " has-media" : ""}`} id="hero" tabIndex={-1}>
+      <HeroArtwork invite={invite} />
       <div className="hero-content">
         <p className="hero-overline">A journey to forever</p>
         <h1 className="hero-couple" aria-label={`${invite.couple.bride} and ${invite.couple.groom}`}>
@@ -75,15 +87,15 @@ function OrnamentDivider({ invite }: { invite: InviteData }) {
 function Blessing({ invite }: { invite: InviteData }) {
   return (
     <section className="invite-section" id="blessing">
-        <div className="invite-content narrow motion-reveal">
-          <div className="blessing-mark devanagari" aria-hidden="true">ॐ</div>
+      <div className="invite-content narrow motion-reveal">
         <p className="invite-eyebrow">With divine blessings</p>
-        <h2 className="invite-heading devanagari" style={{ fontSize: "clamp(30px,5vw,48px)" }}>ॐ श्री गणेशाय नमः</h2>
+        <h2 className="invite-heading devanagari blessing-heading">ॐ श्री गणेशाय नमः</h2>
         <p className="invite-copy">{invite.wording.blessing}</p>
         <OrnamentDivider invite={invite} />
         <p className="invite-eyebrow">{invite.wording.hostHeading}</p>
         <div className="family-grid">
           <div className="family-name"><strong>{invite.couple.bride}</strong><span>{invite.couple.brideFamily}</span></div>
+          <LoveDivider />
           <div className="family-name"><strong>{invite.couple.groom}</strong><span>{invite.couple.groomFamily}</span></div>
         </div>
         <p className="invite-copy">{invite.wording.invitation}</p>
@@ -181,6 +193,7 @@ export function InviteRenderer({ invite, compact = false }: { invite: InviteData
   const audioRef = useRef<HTMLAudioElement>(null);
   const [musicOn, setMusicOn] = useState(false);
   const [musicStarted, setMusicStarted] = useState(false);
+  const [introDismissed, setIntroDismissed] = useState(false);
   const hasMusic = Boolean(invite.musicUrl);
 
   const toggleMusic = () => {
@@ -198,11 +211,15 @@ export function InviteRenderer({ invite, compact = false }: { invite: InviteData
     }
   };
 
+  useEffect(() => {
+    if (!compact && introDismissed) document.getElementById("hero")?.focus();
+  }, [compact, introDismissed]);
+
   const sections: Record<string, ReactNode> = {
     hero: <Hero invite={invite} onStartMusic={() => { if (!musicStarted) toggleMusic(); }} />,
     blessing: <Blessing invite={invite} />,
     date: <SaveTheDate invite={invite} />,
-    countdown: <section className="invite-section" id="countdown"><div className="invite-content motion-reveal"><div className="countdown-frame"><p className="invite-eyebrow">The days are getting closer</p><h2 className="invite-heading">Counting down to forever</h2><Countdown date={invite.weddingDate} />{invite.theme.id === "rajasthani-rose" && <div className="countdown-elephants" data-parallax="elephants"><Image src="/wedding/elephant-pair-v2.webp" alt="Two ornate Rajasthani elephants facing one another" width={1376} height={768} sizes="(max-width: 640px) 92vw, (max-width: 1100px) 62vw, 680px" /></div>}</div></div></section>,
+    countdown: <section className="invite-section" id="countdown"><div className="invite-content motion-reveal"><div className="countdown-frame"><p className="invite-eyebrow">The days are getting closer</p><h2 className="invite-heading">Counting down to forever</h2><Countdown date={invite.weddingDate} />{invite.theme.id === "rajasthani-rose" && <ElephantPair />}</div></div></section>,
     events: <section className="invite-section" id="events"><div className="invite-content motion-reveal"><p className="invite-eyebrow">The celebration</p><h2 className="invite-heading">Join us for every moment</h2><p className="invite-copy">We would love to celebrate each part of this beautiful beginning with you.</p><div className="events-grid">{invite.events.filter((event, index, all) => all.findIndex((item) => item.id === event.id) === index).map((event, index) => <EventCard key={`${event.id}-${index}`} event={event} theme={invite.theme} />)}</div></div></section>,
     gallery: <section className="invite-section" id="gallery"><div className="invite-content motion-reveal"><p className="invite-eyebrow">Little moments, big memories</p><h2 className="invite-heading">Our moments</h2><div style={{ marginTop: 28 }}><GalleryCarousel images={invite.gallery} coupleName={`${invite.couple.bride} & ${invite.couple.groom}`} /></div></div></section>,
     rsvp: <section className="invite-section" id="rsvp"><div className="invite-content narrow"><p className="invite-eyebrow">Kindly reply</p><h2 className="invite-heading">Will you join us?</h2><p className="invite-copy">Your reply helps us make the day special for everyone.</p><RsvpForm invite={invite} /></div></section>,
@@ -213,7 +230,10 @@ export function InviteRenderer({ invite, compact = false }: { invite: InviteData
   return (
     <ThemeProvider theme={invite.theme}>
       <InviteMotionLayer butterflies={invite.theme.butterflies} />
-      {Array.from(new Set(invite.sectionOrder)).filter((id) => invite.sections[id] !== false && sections[id]).map((id) => <div key={id} style={invite.theme.sectionBackgrounds[id] ? { "--section-bg": backgroundValue(invite.theme.sectionBackgrounds[id]) } as CSSProperties : undefined}>{sections[id]}</div>)}
+      {!compact && !introDismissed && <EnvelopeIntro invite={invite} onOpen={toggleMusic} onComplete={() => setIntroDismissed(true)} />}
+      <div className="invite-sections" aria-hidden={!compact && !introDismissed} inert={!compact && !introDismissed}>
+        {Array.from(new Set(invite.sectionOrder)).filter((id) => invite.sections[id] !== false && sections[id]).map((id) => <div key={id} style={invite.theme.sectionBackgrounds[id] ? { "--section-bg": backgroundValue(invite.theme.sectionBackgrounds[id]) } as CSSProperties : undefined}>{sections[id]}</div>)}
+      </div>
       {hasMusic && <><audio ref={audioRef} src={invite.musicUrl} loop preload="none" /><button className="music-toggle" onClick={toggleMusic} type="button" aria-label={musicOn ? "Pause wedding music" : "Play wedding music"}>{musicOn ? <Pause size={18} /> : <Music2 size={18} />}</button></>}
       {compact && <span className="sr-only">Live invitation preview</span>}
     </ThemeProvider>

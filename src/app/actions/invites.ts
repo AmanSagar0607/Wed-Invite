@@ -29,16 +29,39 @@ function makeSlug(bride: string, groom: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 72);
-  return `${names || "wedding"}-${randomBytes(3).toString("hex")}`;
+  return `${names || "wedding"}-${randomBytes(2).toString("hex")}`;
+}
+
+function isUniqueViolation(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "23505";
+}
+
+function publishFailureMessage(error: unknown) {
+  const details = typeof error === "object" && error !== null
+    ? error as { code?: string; message?: string }
+    : {};
+  if (details.message?.includes("DATABASE_URL")) {
+    return "The invitation database is not configured. Your draft is safe; export it or try again after database setup.";
+  }
+  if (details.code === "23505") {
+    return "We could not create a unique invitation link after several attempts. Please retry.";
+  }
+  if (details.code?.startsWith("08") || ["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "ENOTFOUND"].includes(details.code ?? "")) {
+    return "The invitation database could not be reached. Your draft is safe; check your connection and retry.";
+  }
+  return "The invitation could not be saved to the database. Your draft is safe; retry in a moment.";
 }
 
 export async function publishInvite(input: unknown) {
   const parsed = inviteSchema.safeParse(input);
-  if (!parsed.success) return { ok: false as const, error: "Some invitation details need attention. Review the form and try again." };
-
-  if (!parsed.data.couple.bride.trim() || !parsed.data.couple.groom.trim()) {
-    return { ok: false as const, error: "Add both names before publishing your invitation." };
+  if (!parsed.success) {
+    return {
+      ok: false as const,
+      error: "Some invitation details need attention. Review the highlighted fields and try again.",
+      issues: parsed.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+    };
   }
+
   if (parsed.data.events.some((event) => !event.title.trim())) {
     return { ok: false as const, error: "Give each celebration a name before publishing." };
   }
@@ -49,16 +72,29 @@ export async function publishInvite(input: unknown) {
 
   const serialized = JSON.stringify(parsed.data);
   if (Buffer.byteLength(serialized, "utf8") > 4 * 1024 * 1024) {
-    return { ok: false as const, error: "This draft is too large to publish. Ensure photos are uploaded to your media store, then try again." };
+    return { ok: false as const, error: "This invitation is still too large. Upload every local photo to Blob before publishing." };
   }
 
   try {
     const db = getDb();
-    const slug = makeSlug(parsed.data.couple.bride, parsed.data.couple.groom);
-    await db.insert(invites).values({ slug, data: parsed.data });
-    revalidatePath(`/i/${slug}`);
-    return { ok: true as const, slug };
-  } catch {
-    return { ok: false as const, error: "We could not publish this invitation just now. Your draft is still saved in this browser." };
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const slug = makeSlug(parsed.data.couple.bride, parsed.data.couple.groom);
+      try {
+        await db.insert(invites).values({ slug, data: parsed.data });
+        try {
+          revalidatePath(`/i/${slug}`);
+        } catch (error) {
+          console.error("[publishInvite] Invitation saved but route revalidation failed", error);
+        }
+        return { ok: true as const, slug };
+      } catch (error) {
+        if (isUniqueViolation(error) && attempt < 2) continue;
+        throw error;
+      }
+    }
+    return { ok: false as const, error: "We could not create a unique invitation link. Please retry." };
+  } catch (error) {
+    console.error("[publishInvite] Invitation database insert failed", error);
+    return { ok: false as const, error: publishFailureMessage(error) };
   }
 }

@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { put } from "@vercel/blob";
+import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 
@@ -24,7 +26,7 @@ function canUpload(request: Request) {
     uploadWindows.set(ip, { startedAt: now, count: 1 });
     return true;
   }
-  if (current.count >= 30) return false;
+  if (current.count >= 60) return false;
   current.count++;
   return true;
 }
@@ -42,6 +44,32 @@ function createStorageClient() {
 }
 
 export async function POST(request: Request) {
+  if (request.headers.get("content-type")?.includes("application/json")) {
+    if (!canUpload(request)) return NextResponse.json({ error: "Upload request was rejected." }, { status: 403 });
+    try {
+      const body = await request.json() as HandleUploadBody;
+      const response = await handleUpload({
+        body,
+        request,
+        onBeforeGenerateToken: async (pathname) => {
+          if (!/^wedding-invites\/[a-f0-9-]{36}\.(jpg|png|webp)$/i.test(pathname)) {
+            throw new Error("Choose a valid invitation image.");
+          }
+          return {
+            allowedContentTypes: ["image/jpeg", "image/png", "image/webp"],
+            maximumSizeInBytes: 8 * 1024 * 1024,
+            addRandomSuffix: true,
+            tokenPayload: "wedding-invitation-photo",
+          };
+        },
+      });
+      return NextResponse.json(response, { headers: { "Cache-Control": "no-store" } });
+    } catch (error) {
+      console.error("[upload] Client photo token generation failed", error);
+      return NextResponse.json({ error: "Photo storage could not authorize this upload. Check the connected Blob store and retry." }, { status: 503 });
+    }
+  }
+
   if (!canUpload(request)) return NextResponse.json({ error: "Upload request was rejected." }, { status: 403 });
   try {
     const form = await request.formData();
@@ -52,6 +80,16 @@ export async function POST(request: Request) {
     if (file.size < 1 || file.size > sizeLimit) return NextResponse.json({ error: file.type.startsWith("audio/") ? "Audio files must be smaller than 15 MB." : "Images must be smaller than 8 MB." }, { status: 413 });
 
     const key = `uploads/${randomUUID()}.${extensions[file.type]}`;
+    if (file.type.startsWith("image/")) {
+      const blob = await put(key, file, {
+        access: "public",
+        addRandomSuffix: false,
+        contentType: file.type,
+        cacheControlMaxAge: 31_536_000,
+      });
+      return NextResponse.json({ url: blob.url }, { headers: { "Cache-Control": "no-store" } });
+    }
+
     const client = createStorageClient();
     await client.send(new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
@@ -61,7 +99,8 @@ export async function POST(request: Request) {
       CacheControl: "public, max-age=31536000, immutable",
     }));
     return NextResponse.json({ url: `/api/media/${key}` }, { headers: { "Cache-Control": "no-store" } });
-  } catch {
-    return NextResponse.json({ error: "The image could not be uploaded. Try again or keep editing your local draft." }, { status: 503 });
+  } catch (error) {
+    console.error("[upload] Media upload failed", error);
+    return NextResponse.json({ error: "The upload failed. Your invitation draft is safe; check storage connectivity and retry." }, { status: 503 });
   }
 }

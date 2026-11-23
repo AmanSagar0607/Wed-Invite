@@ -49,8 +49,8 @@ export const inviteEventSchema = z.object({
 
 export const inviteSchema = z.object({
   couple: z.object({
-    bride: z.string().max(80),
-    groom: z.string().max(80),
+    bride: z.string().trim().min(1, "Enter the bride's name").max(80),
+    groom: z.string().trim().min(1, "Enter the groom's name").max(80),
     tagline: z.string().max(180),
     brideFamily: z.string().max(160),
     groomFamily: z.string().max(160),
