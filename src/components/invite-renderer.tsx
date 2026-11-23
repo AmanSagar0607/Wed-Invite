@@ -93,7 +93,7 @@ function Blessing({ invite }: { invite: InviteData }) {
         <p className="invite-copy">{invite.wording.blessing}</p>
         <OrnamentDivider invite={invite} />
         <p className="invite-eyebrow">{invite.wording.hostHeading}</p>
-        <div className="family-grid">
+        <div className="family-stack">
           <div className="family-name"><strong>{invite.couple.bride}</strong><span>{invite.couple.brideFamily}</span></div>
           <LoveDivider />
           <div className="family-name"><strong>{invite.couple.groom}</strong><span>{invite.couple.groomFamily}</span></div>
