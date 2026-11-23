@@ -44,7 +44,7 @@ function HeroArtwork({ invite }: { invite: InviteData }) {
 
   return (
     <div className="hero-artwork hero-arch-art" data-parallax="arch" aria-hidden="true">
-      <Image src="/wedding/hero-arch-v2.webp" alt="" width={1264} height={848} sizes="(max-width: 760px) 96vw, 840px" priority />
+      <Image src="/wedding/hero-arch-v2.webp" alt="" width={1264} height={848} sizes="100vw" quality={70} priority />
       <span className="hero-lantern hero-lantern-left" aria-hidden="true"><i /></span>
       <span className="hero-lantern hero-lantern-right" aria-hidden="true"><i /></span>
     </div>
@@ -58,8 +58,9 @@ function Hero({ invite, onStartMusic }: { invite: InviteData; onStartMusic: () =
       <HeroArtwork invite={invite} />
       <div className="hero-content">
         <p className="hero-overline">A journey to forever</p>
-        <h1 className="hero-couple" aria-label={`${invite.couple.bride} and ${invite.couple.groom}`}>
+        <h1 className="hero-couple" aria-label={`${invite.couple.bride} & ${invite.couple.groom}`}>
           <span className="script-name">{invite.couple.bride}</span>
+          <span className="sr-only">&amp;</span>
           <span className="couple-heart" aria-hidden="true"><Heart size={16} fill="currentColor" strokeWidth={1.6} /></span>
           <span className="script-name">{invite.couple.groom}</span>
         </h1>
@@ -189,7 +190,7 @@ function InviteFooter({ invite }: { invite: InviteData }) {
   );
 }
 
-export function InviteRenderer({ invite, compact = false }: { invite: InviteData; compact?: boolean }) {
+export function InviteRenderer({ invite, compact = false, initialNow }: { invite: InviteData; compact?: boolean; initialNow?: number }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [musicOn, setMusicOn] = useState(false);
   const [musicStarted, setMusicStarted] = useState(false);
@@ -219,9 +220,9 @@ export function InviteRenderer({ invite, compact = false }: { invite: InviteData
     hero: <Hero invite={invite} onStartMusic={() => { if (!musicStarted) toggleMusic(); }} />,
     blessing: <Blessing invite={invite} />,
     date: <SaveTheDate invite={invite} />,
-    countdown: <section className="invite-section" id="countdown"><div className="invite-content motion-reveal"><div className="countdown-frame"><p className="invite-eyebrow">The days are getting closer</p><h2 className="invite-heading">Counting down to forever</h2><Countdown date={invite.weddingDate} />{invite.theme.id === "rajasthani-rose" && <ElephantPair />}</div></div></section>,
+    countdown: <section className="invite-section" id="countdown"><div className="invite-content motion-reveal"><div className="countdown-frame"><p className="invite-eyebrow">The days are getting closer</p><h2 className="invite-heading">Counting down to forever</h2><Countdown date={invite.weddingDate} initialNow={initialNow} />{invite.theme.id === "rajasthani-rose" && <ElephantPair />}</div></div></section>,
     events: <section className="invite-section" id="events"><div className="invite-content motion-reveal"><p className="invite-eyebrow">The celebration</p><h2 className="invite-heading">Join us for every moment</h2><p className="invite-copy">We would love to celebrate each part of this beautiful beginning with you.</p><div className="events-grid">{invite.events.filter((event, index, all) => all.findIndex((item) => item.id === event.id) === index).map((event, index) => <EventCard key={`${event.id}-${index}`} event={event} theme={invite.theme} />)}</div></div></section>,
-    gallery: <section className="invite-section" id="gallery"><div className="invite-content motion-reveal"><p className="invite-eyebrow">Little moments, big memories</p><h2 className="invite-heading">Our moments</h2><div style={{ marginTop: 28 }}><GalleryCarousel images={invite.gallery} coupleName={`${invite.couple.bride} & ${invite.couple.groom}`} /></div></div></section>,
+    gallery: invite.gallery.length > 0 ? <section className="invite-section" id="gallery"><div className="invite-content motion-reveal"><p className="invite-eyebrow">Little moments, big memories</p><h2 className="invite-heading">Our moments</h2><div style={{ marginTop: 28 }}><GalleryCarousel images={invite.gallery} coupleName={`${invite.couple.bride} & ${invite.couple.groom}`} /></div></div></section> : null,
     rsvp: <section className="invite-section" id="rsvp"><div className="invite-content narrow"><p className="invite-eyebrow">Kindly reply</p><h2 className="invite-heading">Will you join us?</h2><p className="invite-copy">Your reply helps us make the day special for everyone.</p><RsvpForm invite={invite} /></div></section>,
     share: <ShareCard invite={invite} />,
     footer: <InviteFooter invite={invite} />,

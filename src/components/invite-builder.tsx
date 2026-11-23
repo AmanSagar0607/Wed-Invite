@@ -273,7 +273,12 @@ export function InviteBuilder({ initialThemeId }: { initialThemeId?: string }) {
   const addContact = () => updateTop("contacts", [...invite.contacts, { name: "", phone: "" }]);
 
   return (
-    <main className="studio-shell">
+    <main className="studio-shell" aria-busy={!hydrated}>
+      {!hydrated && <div className="draft-loading" role="status" aria-label="Loading saved invitation draft">
+        <div className="draft-loading-card"><span className="draft-loading-line draft-loading-title" /><span className="draft-loading-line" /><span className="draft-loading-line draft-loading-short" /><span className="draft-loading-button" /></div>
+        <div className="draft-loading-preview"><span className="draft-loading-line draft-loading-title" /><span className="draft-loading-line draft-loading-short" /></div>
+        <span className="draft-loading-label">Loading your saved draft…</span>
+      </div>}
       <header className="studio-header">
         <Link href="/create" className="brand" style={{ color: "inherit", textDecoration: "none" }}><span className="brand-mark">W</span><span>Wedding Invite Studio</span></Link>
         <div className="header-actions">

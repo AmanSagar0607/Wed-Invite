@@ -25,7 +25,7 @@ export function GalleryEditor({ images, onChange }: { images: string[]; onChange
           next.splice(index, 0, item);
           onChange(next);
         }} style={{ position: "relative", borderRadius: 10, overflow: "hidden", aspectRatio: "1", background: "#f0e7de", cursor: "grab" }}>
-          <Image src={image} alt={`Gallery photo ${index + 1}`} width={180} height={180} unoptimized style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          <Image src={image} alt={`Gallery photo ${index + 1}`} width={180} height={180} sizes="(max-width: 480px) 28vw, 150px" quality={70} unoptimized style={{ width: "100%", height: "100%", objectFit: "contain" }} />
           <div style={{ position: "absolute", right: 4, bottom: 4, display: "flex", gap: 3 }}>
             <button type="button" aria-label={`Move photo ${index + 1} up`} onClick={() => move(index, -1)} disabled={index === 0} style={{ width: 25, height: 25, border: 0, borderRadius: "50%", background: "#fffF", color: "#5d473e", cursor: "pointer" }}><ChevronUp size={14} /></button>
             <button type="button" aria-label={`Move photo ${index + 1} down`} onClick={() => move(index, 1)} disabled={index === images.length - 1} style={{ width: 25, height: 25, border: 0, borderRadius: "50%", background: "#fffF", color: "#5d473e", cursor: "pointer" }}><ChevronDown size={14} /></button>
