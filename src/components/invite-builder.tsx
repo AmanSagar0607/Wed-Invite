@@ -236,9 +236,14 @@ export function InviteBuilder({ initialThemeId }: { initialThemeId?: string }) {
       setPublishedUrl(url);
       setSaveStatus("Invitation published");
     } catch (error) {
-      setPublishError(error instanceof Error
-        ? error.message
-        : "The server did not finish publishing. Your draft is safe; retry or download a standalone copy.");
+      const message = error instanceof Error ? error.message : "";
+      if (/network|fetch|offline|timeout/i.test(message)) {
+        setPublishError("The publish request lost its network connection. Your draft is safe; reconnect and retry.");
+      } else if (/photo|image|blob|upload|storage/i.test(message)) {
+        setPublishError(`${message || "A photo could not be uploaded."} Your draft is safe; retry the upload or remove that photo.`);
+      } else {
+        setPublishError("The publish request did not finish. Your draft is safe; retry or download a standalone copy.");
+      }
     } finally {
       setPublishing(false);
       setPublishStatus("");

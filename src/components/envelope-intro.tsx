@@ -42,6 +42,7 @@ export function EnvelopeIntro({ invite, onOpen, onComplete }: { invite: InviteDa
         <div className="envelope-scene">
           <motion.div
             className="envelope-card"
+            style={{ zIndex: opening ? 7 : 2 }}
             animate={opening ? { y: "-28vh", scale: 1.42, opacity: 1 } : { y: 20, scale: 0.94, opacity: 0.92 }}
             transition={reducedMotion ? { duration: 0.12 } : { duration: 0.8, delay: opening ? 0.54 : 0, type: "spring", stiffness: 90, damping: 16 }}
             aria-hidden="true"

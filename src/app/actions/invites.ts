@@ -46,10 +46,16 @@ function publishFailureMessage(error: unknown) {
   if (details.code === "23505") {
     return "We could not create a unique invitation link after several attempts. Please retry.";
   }
-  if (details.code?.startsWith("08") || ["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "ENOTFOUND"].includes(details.code ?? "")) {
+  if (details.code === "42P01") {
+    return "The invitations table is missing from the connected database. Your draft is safe; ask the project owner to apply the invitation database setup.";
+  }
+  if (details.code === "42501") {
+    return "The connected database does not allow invitation publishing. Your draft is safe; review the database role permissions.";
+  }
+  if (details.code?.startsWith("08") || ["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN"].includes(details.code ?? "")) {
     return "The invitation database could not be reached. Your draft is safe; check your connection and retry.";
   }
-  return "The invitation could not be saved to the database. Your draft is safe; retry in a moment.";
+  return "The invitation could not be saved. Your draft is safe; retry in a moment or download a standalone copy.";
 }
 
 export async function publishInvite(input: unknown) {
