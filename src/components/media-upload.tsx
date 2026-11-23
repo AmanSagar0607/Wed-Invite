@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 import { ImagePlus, LoaderCircle, Trash2, Upload } from "lucide-react";
+import { uploadInviteImage } from "@/lib/media-client";
 
 async function prepareImage(file: File) {
   const bitmap = await createImageBitmap(file);
@@ -37,16 +38,13 @@ export function MediaUpload({ label, value, onChange, multiple = false }: { labe
     setBusy(true);
     try {
       const optimized = await prepareImage(file);
-      const form = new FormData();
-      form.set("file", optimized, `${file.name.replace(/\.[^.]+$/, "") || "invite"}.jpg`);
-      const response = await fetch("/api/upload", { method: "POST", body: form });
-      if (response.ok) {
-        const result = await response.json() as { url: string };
-        onChange(result.url);
-        setMessage("Optimized and saved to your media store.");
-      } else {
+      try {
+        const upload = new File([optimized], `${file.name.replace(/\.[^.]+$/, "") || "invite"}.jpg`, { type: "image/jpeg" });
+        onChange(await uploadInviteImage(upload));
+        setMessage("Optimized and saved to Vercel Blob.");
+      } catch (error) {
         onChange(await asDataUrl(optimized));
-        setMessage("Saved in this browser draft. R2 upload is unavailable.");
+        setMessage(`${error instanceof Error ? error.message : "Photo upload failed."} Saved in this browser draft; retry before publishing.`);
       }
     } catch {
       setMessage("This image could not be processed. Try another photo.");
@@ -88,24 +86,28 @@ export function MediaUpload({ label, value, onChange, multiple = false }: { labe
 export function GalleryUploadButton({ onFiles }: { onFiles: (files: string[]) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
   const addFiles = async (files: File[]) => {
     if (!files.length) return;
     setBusy(true);
+    setMessage("");
     const uploaded: string[] = [];
+    let localOnly = 0;
     try {
       for (const file of files.slice(0, 8)) {
         const optimized = await prepareImage(file);
-        const form = new FormData();
-        form.set("file", optimized, `${file.name.replace(/\.[^.]+$/, "") || "moment"}.jpg`);
-        const response = await fetch("/api/upload", { method: "POST", body: form });
-        if (response.ok) {
-          const result = await response.json() as { url: string };
-          uploaded.push(result.url);
-        } else {
+        try {
+          const upload = new File([optimized], `${file.name.replace(/\.[^.]+$/, "") || "moment"}.jpg`, { type: "image/jpeg" });
+          uploaded.push(await uploadInviteImage(upload));
+        } catch {
           uploaded.push(await asDataUrl(optimized));
+          localOnly += 1;
         }
       }
       onFiles(uploaded);
+      setMessage(localOnly ? `${localOnly} photo${localOnly === 1 ? "" : "s"} saved only in this browser draft; upload before publishing.` : `${uploaded.length} photo${uploaded.length === 1 ? "" : "s"} uploaded to Vercel Blob.`);
+    } catch {
+      setMessage("Some photos could not be prepared. Try smaller JPEG, PNG, or WebP images.");
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -116,6 +118,7 @@ export function GalleryUploadButton({ onFiles }: { onFiles: (files: string[]) =>
     <>
       <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(event) => void addFiles(Array.from(event.target.files ?? []))} />
       <button className="button-secondary" type="button" disabled={busy} onClick={() => inputRef.current?.click()}><Upload size={14} />{busy ? "Preparing photos…" : "Add photos"}</button>
+      {message && <span role="status" style={{ display: "block", marginTop: 7, color: "#88766c", fontSize: 9, lineHeight: 1.5 }}>{message}</span>}
     </>
   );
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   CalendarDays,
   ChevronDown,
+  Copy,
   ChevronUp,
   Download,
   FileText,
@@ -13,10 +14,12 @@ import {
   Palette,
   PartyPopper,
   Save,
+  Share2,
   Sparkles,
   Upload,
   UsersRound,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { publishInvite } from "@/app/actions/invites";
 import { AudioUpload } from "@/components/audio-upload";
 import { EventsEditor } from "@/components/events-editor";
@@ -25,6 +28,8 @@ import { InviteRenderer } from "@/components/invite-renderer";
 import { MediaUpload } from "@/components/media-upload";
 import { ThemeEditor } from "@/components/theme-editor";
 import { inviteSchema, type InviteData } from "@/lib/invite-schema";
+import { uploadInviteImageDataUrl } from "@/lib/media-client";
+import { createStandaloneInviteHtml } from "@/lib/export-standalone";
 import { sampleInvite } from "@/lib/sample-invite";
 import { getThemeById } from "@/lib/themes";
 
@@ -68,6 +73,30 @@ function initialData(themeId?: string): InviteData {
   return themeId ? { ...sampleInvite, theme: getThemeById(themeId) } : sampleInvite;
 }
 
+function draftWithoutInlineImages(invite: InviteData): InviteData {
+  const remoteOrEmpty = (value: string) => value.startsWith("data:image/") ? "" : value;
+  return {
+    ...invite,
+    heroImage: remoteOrEmpty(invite.heroImage),
+    events: invite.events.map((event) => ({ ...event, imageUrl: remoteOrEmpty(event.imageUrl) })),
+    gallery: invite.gallery.map(remoteOrEmpty),
+  };
+}
+
+function formatValidationIssue(path: string, message: string) {
+  const labels: Record<string, string> = {
+    "couple.bride": "Bride's name",
+    "couple.groom": "Groom's name",
+    "weddingDate": "Wedding date",
+    "heroImage": "Cover photo",
+    "wording.blessing": "Blessing text",
+    "wording.invitation": "Invitation message",
+  };
+  const eventTitle = path.match(/^events\.(\d+)\.title$/);
+  const label = labels[path] || (eventTitle ? `Celebration ${Number(eventTitle[1]) + 1} name` : path.replaceAll(".", " · "));
+  return `${label}: ${message}`;
+}
+
 export function InviteBuilder({ initialThemeId }: { initialThemeId?: string }) {
   const importRef = useRef<HTMLInputElement>(null);
   const [invite, setInvite] = useState<InviteData>(() => initialData(initialThemeId));
@@ -75,7 +104,9 @@ export function InviteBuilder({ initialThemeId }: { initialThemeId?: string }) {
   const [hydrated, setHydrated] = useState(false);
   const [saveStatus, setSaveStatus] = useState("Preparing your draft…");
   const [publishError, setPublishError] = useState("");
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [publishing, setPublishing] = useState(false);
+  const [publishStatus, setPublishStatus] = useState("");
   const [publishedUrl, setPublishedUrl] = useState("");
   const [copied, setCopied] = useState(false);
   const [mode, setMode] = useState<"edit" | "preview">("edit");
@@ -105,7 +136,12 @@ export function InviteBuilder({ initialThemeId }: { initialThemeId?: string }) {
         localStorage.setItem("wedding-invite-draft", JSON.stringify(invite));
         setSaveStatus("Draft saved in this browser");
       } catch {
-        setSaveStatus("Draft is too large for browser storage; upload photos to R2");
+        try {
+          localStorage.setItem("wedding-invite-draft", JSON.stringify(draftWithoutInlineImages(invite)));
+          setSaveStatus("Draft saved without local photo data; upload photos before publishing");
+        } catch {
+          setSaveStatus("Browser storage is full; export your draft before closing this page");
+        }
       }
     }, 400);
     return () => window.clearTimeout(timer);
@@ -126,6 +162,16 @@ export function InviteBuilder({ initialThemeId }: { initialThemeId?: string }) {
     URL.revokeObjectURL(url);
   };
 
+  const exportStandalone = () => {
+    const file = new Blob([createStandaloneInviteHtml(invite)], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${invite.couple.bride}-${invite.couple.groom}-invitation.html`.toLowerCase().replace(/[^a-z0-9.-]+/g, "-");
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const importDraft = async (file?: File) => {
     if (!file) return;
     try {
@@ -133,6 +179,7 @@ export function InviteBuilder({ initialThemeId }: { initialThemeId?: string }) {
       setInvite(parsed);
       setPublishedUrl("");
       setPublishError("");
+      setValidationErrors([]);
       setSaveStatus("Imported draft · saving locally…");
     } catch {
       setPublishError("That file is not a valid Wedding Invite Studio draft.");
@@ -146,24 +193,55 @@ export function InviteBuilder({ initialThemeId }: { initialThemeId?: string }) {
     setInvite(initialData());
     setPublishedUrl("");
     setPublishError("");
+    setValidationErrors([]);
   };
 
   const handlePublish = async () => {
     setPublishError("");
+    setValidationErrors([]);
+    setPublishedUrl("");
+    const parsed = inviteSchema.safeParse(invite);
+    if (!parsed.success) {
+      setPublishError("Review these invitation details before publishing:");
+      setValidationErrors(parsed.error.issues.map((issue) => formatValidationIssue(issue.path.join("."), issue.message)));
+      return;
+    }
+
+    const payload = parsed.data;
+    const pendingPhotos: Array<{ label: string; value: string; replace: (url: string) => void }> = [];
+    if (payload.heroImage.startsWith("data:image/")) pendingPhotos.push({ label: "Cover photo", value: payload.heroImage, replace: (url) => { payload.heroImage = url; } });
+    payload.events.forEach((event, index) => {
+      if (event.imageUrl.startsWith("data:image/")) pendingPhotos.push({ label: `Celebration ${index + 1} photo`, value: event.imageUrl, replace: (url) => { event.imageUrl = url; } });
+    });
+    payload.gallery.forEach((image, index) => {
+      if (image.startsWith("data:image/")) pendingPhotos.push({ label: `Gallery photo ${index + 1}`, value: image, replace: (url) => { payload.gallery[index] = url; } });
+    });
+
     setPublishing(true);
+    setPublishStatus(pendingPhotos.length ? `Uploading photos 0/${pendingPhotos.length}…` : "Saving invitation…");
     try {
-      const result = await publishInvite(invite);
+      for (const [index, photo] of pendingPhotos.entries()) {
+        setPublishStatus(`Uploading photos ${index + 1}/${pendingPhotos.length} · ${photo.label}`);
+        photo.replace(await uploadInviteImageDataUrl(photo.value));
+      }
+      if (pendingPhotos.length) setInvite(payload);
+      setPublishStatus("Saving invitation…");
+      const result = await publishInvite(payload);
       if (!result.ok) {
         setPublishError(result.error);
+        if ("issues" in result && result.issues) setValidationErrors(result.issues.map((issue) => formatValidationIssue(issue.path, issue.message)));
         return;
       }
       const url = `${window.location.origin}/i/${result.slug}`;
       setPublishedUrl(url);
       setSaveStatus("Invitation published");
-    } catch {
-      setPublishError("We could not publish this invitation. Your local draft is safe to keep editing.");
+    } catch (error) {
+      setPublishError(error instanceof Error
+        ? error.message
+        : "The server did not finish publishing. Your draft is safe; retry or download a standalone copy.");
     } finally {
       setPublishing(false);
+      setPublishStatus("");
     }
   };
 
@@ -195,7 +273,7 @@ export function InviteBuilder({ initialThemeId }: { initialThemeId?: string }) {
         <Link href="/create" className="brand" style={{ color: "inherit", textDecoration: "none" }}><span className="brand-mark">W</span><span>Wedding Invite Studio</span></Link>
         <div className="header-actions">
           <Link href="/templates" className="text-link">Explore templates</Link>
-          <button className="header-button" type="button" onClick={handlePublish} disabled={publishing}><Save size={14} />{publishing ? "Publishing…" : "Publish invite"}</button>
+          <button className="header-button" type="button" onClick={handlePublish} disabled={publishing}><Save size={14} />{publishing ? publishStatus.startsWith("Uploading") ? "Uploading photos…" : "Saving…" : "Publish invite"}</button>
         </div>
       </header>
 
@@ -215,13 +293,32 @@ export function InviteBuilder({ initialThemeId }: { initialThemeId?: string }) {
 
           <div className="editor-toolbar">
             <button className="button-secondary" type="button" onClick={exportDraft}><Download size={14} />Export JSON</button>
+            <button className="button-secondary" type="button" onClick={exportStandalone}><Download size={14} />Export HTML</button>
             <button className="button-secondary" type="button" onClick={() => importRef.current?.click()}><Upload size={14} />Import JSON</button>
             <button className="button-secondary" type="button" onClick={resetDraft}>New invitation</button>
             <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={(event) => void importDraft(event.target.files?.[0])} />
           </div>
 
-          {publishedUrl && <div className="notice success"><strong>Your invitation is live.</strong><div style={{ display: "flex", gap: 7, alignItems: "center", marginTop: 8 }}><a href={publishedUrl} target="_blank" rel="noreferrer" style={{ color: "inherit", fontSize: 10, overflowWrap: "anywhere" }}>{publishedUrl}</a><button type="button" className="icon-button" aria-label="Copy invitation link" onClick={copyPublishedLink}><Save size={14} /></button></div>{copied && <span> Link copied</span>}</div>}
-          {publishError && <div className="notice" role="alert">{publishError}</div>}
+          {publishing && <div className="notice publish-progress" role="status">{publishStatus}</div>}
+          {publishedUrl && <div className="notice success published-notice">
+            <strong>Your invitation is live.</strong>
+            <a className="published-url" href={publishedUrl} target="_blank" rel="noreferrer">{publishedUrl}</a>
+            <div className="published-actions">
+              <button type="button" className="button-secondary" onClick={copyPublishedLink}><Copy size={14} />{copied ? "Link copied" : "Copy link"}</button>
+              <a className="button-secondary" href={`https://wa.me/?text=${encodeURIComponent(`Join ${invite.couple.bride} and ${invite.couple.groom} for their celebration: ${publishedUrl}`)}`} target="_blank" rel="noreferrer"><Share2 size={14} />WhatsApp</a>
+            </div>
+            <div className="published-qr"><QRCodeSVG value={publishedUrl} size={112} level="Q" title="QR code for this invitation" /><span>Scan to open the invitation</span></div>
+          </div>}
+          {publishError && <div className="notice publish-error" role="alert">
+            <strong>Could not publish</strong>
+            <p>{publishError}</p>
+            {validationErrors.length > 0 && <ul>{validationErrors.map((error, index) => <li key={`${error}-${index}`}>{error}</li>)}</ul>}
+            <div className="publish-recovery-actions">
+              <button className="button-secondary" type="button" onClick={handlePublish} disabled={publishing}><Save size={14} />Retry</button>
+              <button className="button-secondary" type="button" onClick={exportDraft}><Download size={14} />Export JSON</button>
+              <button className="button-secondary" type="button" onClick={exportStandalone}><Download size={14} />Download HTML</button>
+            </div>
+          </div>}
 
           <Accordion title="The couple" icon={<Heart size={15} />} open={openSections.couple} onToggle={() => togglePanel("couple")}>
             <div className="field-grid">
@@ -251,7 +348,7 @@ export function InviteBuilder({ initialThemeId }: { initialThemeId?: string }) {
               <AudioUpload value={invite.musicUrl} onChange={(value) => updateTop("musicUrl", value)} />
               <div className="field full"><span className="field-label">Hero video guidance</span><p style={{ margin: 0, color: "#88776d", fontSize: 9, lineHeight: 1.5 }}>{invite.heroVideo === "/wedding.mp4" ? "The supplied sample is a complete invitation film, so it is not layered beneath the live sections. Add a short, text-free ambient clip instead." : "Use a short, text-free ambient clip so the invitation details remain clear."}</p>{invite.heroVideo && <div className="inline-actions" style={{ marginTop: 0 }}><button className="button-secondary" type="button" onClick={() => updateTop("heroVideo", "")}>Remove video</button></div>}</div>
               <MediaUpload label="Cover photo" value={invite.heroImage} onChange={(value) => updateTop("heroImage", value)} />
-              <p className="field full" style={{ color: "#88776d", fontSize: 9, lineHeight: 1.5 }}>Photo uploads are compressed in your browser and stored privately in R2. They are served through this app only when used in a published invite.</p>
+              <p className="field full" style={{ color: "#88776d", fontSize: 9, lineHeight: 1.5 }}>Photos are compressed in your browser and uploaded to the connected Vercel Blob store. If an upload is unavailable, the image stays in this browser draft and will be retried when you publish.</p>
             </div>
           </Accordion>
 
@@ -288,7 +385,7 @@ export function InviteBuilder({ initialThemeId }: { initialThemeId?: string }) {
 
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 20 }}>
             <Link href="/templates" className="button-secondary" style={{ textDecoration: "none" }}>Browse templates</Link>
-            <button className="button-primary" type="button" onClick={handlePublish} disabled={publishing}><Save size={14} />{publishing ? "Publishing…" : "Publish invitation"}</button>
+            <button className="button-primary" type="button" onClick={handlePublish} disabled={publishing}><Save size={14} />{publishing ? publishStatus.startsWith("Uploading") ? "Uploading photos…" : "Saving…" : "Publish invitation"}</button>
           </div>
         </aside>
 
