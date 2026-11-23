@@ -59,7 +59,7 @@ export function MediaUpload({ label, value, onChange, multiple = false }: { labe
       <span className="field-label">{label}</span>
       {value ? (
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: 8, border: "1px solid #eee3d9", borderRadius: 11, background: "#fffdfa" }}>
-          <Image src={value} alt={`${label} preview`} width={58} height={52} unoptimized style={{ width: 58, height: 52, borderRadius: 8, objectFit: "contain", background: "#f6eee4" }} />
+          <Image src={value} alt={`${label} preview`} width={58} height={52} sizes="58px" quality={70} unoptimized style={{ width: 58, height: 52, borderRadius: 8, objectFit: "contain", background: "#f6eee4" }} />
           <span style={{ flex: 1, minWidth: 0, color: "#7e6f65", fontSize: 10, overflowWrap: "anywhere" }}>{value.startsWith("data:") ? "Local browser image" : "Uploaded image"}</span>
           <button type="button" className="icon-button" aria-label={`Remove ${label.toLowerCase()}`} onClick={() => { onChange(""); setMessage(""); }}><Trash2 size={15} /></button>
         </div>

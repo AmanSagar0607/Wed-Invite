@@ -41,7 +41,7 @@ export function EventCard({ event, theme }: { event: InviteEvent; theme: InviteT
         {event.mapsUrl && <a className="round-link" href={event.mapsUrl} target="_blank" rel="noreferrer" aria-label={`Open map for ${event.title}`}><MapPin size={17} /></a>}
         <a className="round-link" href={calendarFile(event)} download={`${event.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.ics`} aria-label={`Add ${event.title} to calendar`}><CalendarDays size={16} /></a>
       </div>
-      {eventImage && <div className="event-photo-frame"><Image className="event-photo" src={eventImage} alt={event.imageUrl ? `${event.title} celebration` : `${event.title} palace illustration`} width={1376} height={768} sizes="(max-width: 640px) calc(100vw - 64px), (max-width: 1000px) 42vw, 320px" unoptimized={Boolean(event.imageUrl)} loading="lazy" /></div>}
+      {eventImage && <div className="event-photo-frame"><Image className="event-photo" src={eventImage} alt={event.imageUrl ? `${event.title} celebration` : `${event.title} palace illustration`} width={1376} height={768} sizes="(max-width: 640px) calc(100vw - 64px), (max-width: 1000px) 42vw, 320px" quality={70} unoptimized={Boolean(event.imageUrl)} loading="lazy" /></div>}
     </article>
   );
 }

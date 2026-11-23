@@ -39,6 +39,12 @@ function ElephantTrunk({ side, angles }: { side: "left" | "right"; angles: Retur
               <TrunkSegment path="M0 0 C1 12 -2 24 -8 36" />
               <motion.g transform="translate(-8 36)" className="elephant-trunk-joint" style={{ rotate: angles[4] }}>
                 <TrunkSegment path="M0 0 C-10 8 -16 15 -13 22 C-10 29 -1 29 2 22" />
+                <motion.g transform="translate(2 22)" className="elephant-trunk-joint" style={{ rotate: angles[5] }}>
+                  <TrunkSegment path="M0 0 C4 5 3 10 -1 14" />
+                  <motion.g transform="translate(-1 14)" className="elephant-trunk-joint" style={{ rotate: angles[6] }}>
+                    <TrunkSegment path="M0 0 C-2 4 -1 7 2 9" />
+                  </motion.g>
+                </motion.g>
               </motion.g>
             </motion.g>
           </motion.g>
@@ -62,11 +68,15 @@ export function ElephantPair() {
   const target2 = useMotionValue(0);
   const target3 = useMotionValue(0);
   const target4 = useMotionValue(0);
+  const target5 = useMotionValue(0);
+  const target6 = useMotionValue(0);
   const angle0 = useSpring(target0, springConfig);
   const angle1 = useSpring(target1, springConfig);
   const angle2 = useSpring(target2, springConfig);
   const angle3 = useSpring(target3, springConfig);
   const angle4 = useSpring(target4, springConfig);
+  const angle5 = useSpring(target5, springConfig);
+  const angle6 = useSpring(target6, springConfig);
   const tiltTarget = useMotionValue(0);
   const tilt = useSpring(tiltTarget, { stiffness: 140, damping: 18, mass: 0.8 });
 
@@ -77,13 +87,15 @@ export function ElephantPair() {
       target2.set(0);
       target3.set(0);
       target4.set(0);
+      target5.set(0);
+      target6.set(0);
       return;
     }
 
     const startedAt = performance.now();
     let frame = 0;
     const tick = (now: number) => {
-      const phase = ((now - startedAt) % 4_200) / 4_200;
+      const phase = ((now - startedAt) % 7_000) / 7_000;
       const ease = (value: number) => value * value * (3 - 2 * value);
       let curl = 0;
       if (phase < 0.27) curl = -22 * ease(phase / 0.27);
@@ -97,14 +109,16 @@ export function ElephantPair() {
       target2.set(angle1.get() * 0.62 + curl * 0.12 + scroll * 0.16);
       target3.set(angle2.get() * 0.62 + curl * 0.1 + scroll * 0.12);
       target4.set(angle3.get() * 0.58 + curl * 0.08 + scroll * 0.08);
+      target5.set(angle4.get() * 0.54 + curl * 0.06 + scroll * 0.06);
+      target6.set(angle5.get() * 0.5 + curl * 0.04 + scroll * 0.04);
       frame = window.requestAnimationFrame(tick);
     };
 
     frame = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(frame);
-  }, [visible, reducedMotion, easedScrollSwing, target0, target1, target2, target3, target4, angle0, angle1, angle2, angle3]);
+  }, [visible, reducedMotion, easedScrollSwing, target0, target1, target2, target3, target4, target5, target6, angle0, angle1, angle2, angle3, angle4, angle5]);
 
-  const angles = [angle0, angle1, angle2, angle3, angle4];
+  const angles = [angle0, angle1, angle2, angle3, angle4, angle5, angle6];
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== "mouse" || reducedMotion) return;
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -121,7 +135,7 @@ export function ElephantPair() {
       aria-hidden="true"
     >
       <motion.div className="elephant-pair-tilt" style={{ rotateY: tilt, transformStyle: "preserve-3d" }}>
-        <Image src="/wedding/elephant-pair-v2.webp" alt="" width={1376} height={768} sizes="(max-width: 640px) 92vw, (max-width: 1100px) 62vw, 680px" />
+        <Image src="/wedding/elephant-pair-v2.webp" alt="" width={1376} height={768} sizes="(max-width: 640px) 92vw, (max-width: 1100px) 62vw, 680px" quality={70} />
         <svg className="elephant-trunk-rig" viewBox="0 0 1376 768" preserveAspectRatio="none">
           <defs>
             <linearGradient id="trunk-shade" x1="0" x2="1" y1="0" y2="0">

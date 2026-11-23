@@ -42,7 +42,7 @@ export function GalleryCarousel({ images, coupleName }: { images: string[]; coup
       }}>
         {images.map((image, index) => (
           <button className="gallery-image-button" key={`${image}-${index}`} type="button" onClick={() => setLightbox(image)} aria-label={`View moment ${index + 1} of ${images.length}`}>
-            <Image className="gallery-image" src={image} alt={`${coupleName} — celebration moment ${index + 1}`} width={900} height={1200} unoptimized loading="lazy" sizes="(max-width: 640px) 82vw, (max-width: 1000px) 45vw, 620px" />
+            <Image className="gallery-image" src={image} alt={`${coupleName} — celebration moment ${index + 1}`} width={900} height={1200} quality={70} unoptimized loading="lazy" sizes="(max-width: 640px) 82vw, (max-width: 1000px) 45vw, 620px" />
           </button>
         ))}
       </div>
@@ -56,7 +56,7 @@ export function GalleryCarousel({ images, coupleName }: { images: string[]; coup
       {lightbox && (
         <div className="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer" onClick={() => setLightbox(null)}>
           <button type="button" aria-label="Close photo viewer" onClick={() => setLightbox(null)}><X size={20} /></button>
-          <Image className="lightbox-image" src={lightbox} alt={`${coupleName} celebration`} width={1800} height={1400} unoptimized onClick={(event) => event.stopPropagation()} />
+          <Image className="lightbox-image" src={lightbox} alt={`${coupleName} celebration`} width={1800} height={1400} quality={70} unoptimized onClick={(event) => event.stopPropagation()} />
         </div>
       )}
     </>

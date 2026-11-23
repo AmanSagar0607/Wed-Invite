@@ -32,7 +32,7 @@ export default async function PublicInvitePage({ params, searchParams }: InviteP
   try {
     const invite = await getPublishedInvite(slug);
     if (!invite) notFound();
-    return <InviteRenderer invite={preview ? { ...invite, theme: getThemeById(preview) } : invite} />;
+    return <InviteRenderer invite={preview ? { ...invite, theme: getThemeById(preview) } : invite} initialNow={Date.now()} />;
   } catch {
     notFound();
   }
