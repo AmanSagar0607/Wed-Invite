@@ -287,7 +287,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .phone-control select { width: 82px; }
 .choice-row { display: flex; flex-wrap: wrap; gap: 14px; }
 .choice-row label { display: flex; align-items: center; gap: 7px; color: var(--ink); font-size: 12px; text-transform: none; letter-spacing: 0; }
-.choice-row input, .event-checks input { width: 13px; min-width: 13px; height: 13px; min-height: 13px; margin: 0; padding: 0; accent-color: var(--primary); }
+.choice-row input[type="radio"], .event-checks input[type="checkbox"] { box-sizing: border-box; width: 16px !important; min-width: 16px !important; height: 16px !important; min-height: 16px !important; margin: 0; padding: 0; accent-color: var(--primary); }
 .event-checks { display: grid; grid-template-columns: repeat(auto-fit,minmax(155px,1fr)); gap: 7px 12px; }
 .event-checks label { display: flex; align-items: center; gap: 7px; color: var(--ink); font-size: 11px; }
 .stepper-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }

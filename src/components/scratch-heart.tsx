@@ -221,7 +221,7 @@ export function ScratchHeart({ label, value, first, second, storageKey, onReveal
           onLostPointerCapture={checkReveal}
         />
       </div>
-      {!revealed && <button className="scratch-reveal-button" type="button" onClick={reveal}>Tap to reveal</button>}
+      {!revealed && <button className="scratch-reveal-button" type="button" onPointerDown={(event) => { event.preventDefault(); reveal(); }} onClick={reveal}>Tap to reveal</button>}
     </div>
   );
 }
