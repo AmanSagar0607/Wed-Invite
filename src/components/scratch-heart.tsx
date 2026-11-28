@@ -31,6 +31,7 @@ export function ScratchHeart({ label, value, first, second, storageKey, onReveal
   const activeStrokeRef = useRef<ScratchStroke | null>(null);
   const sampleMaskRef = useRef<Uint8Array>(new Uint8Array());
   const sampledHeartPixelsRef = useRef(0);
+  const movedRef = useRef(false);
   const [revealed, setRevealed] = useState(false);
   const [storageReady, setStorageReady] = useState(false);
 
@@ -154,6 +155,7 @@ export function ScratchHeart({ label, value, first, second, storageKey, onReveal
     event.currentTarget.setPointerCapture(event.pointerId);
     const bounds = event.currentTarget.getBoundingClientRect();
     const stroke: ScratchStroke = { points: [pointFromEvent(event)], radius: 22 / Math.min(bounds.width, bounds.height) };
+    movedRef.current = false;
     strokesRef.current.push(stroke);
     activeStrokeRef.current = stroke;
     redraw();
@@ -165,6 +167,7 @@ export function ScratchHeart({ label, value, first, second, storageKey, onReveal
     const point = pointFromEvent(event);
     const previous = stroke.points[stroke.points.length - 1];
     const distance = Math.hypot((point.x - previous.x) * 100, (point.y - previous.y) * 100);
+    if (distance > 1.5) movedRef.current = true;
     const steps = Math.max(1, Math.ceil(distance / 2));
     for (let step = 1; step <= steps; step += 1) {
       const progress = step / steps;
@@ -178,7 +181,12 @@ export function ScratchHeart({ label, value, first, second, storageKey, onReveal
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");
     const mask = sampleMaskRef.current;
-    if (!canvas || !context || !sampledHeartPixelsRef.current || revealed) return;
+    if (!canvas || !context || revealed) return;
+    if (!movedRef.current) {
+      reveal();
+      return;
+    }
+    if (!sampledHeartPixelsRef.current) return;
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
     let cleared = 0;
     let sampleIndex = 0;

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import Image from "next/image";
 import { ChevronDown, Copy, Feather, Flower2, Heart, Minus, Music2, Pause, Phone, Share2 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import type { InviteData } from "@/lib/invite-schema";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Countdown } from "@/components/countdown";
@@ -141,7 +142,9 @@ function SaveTheDate({ invite }: { invite: InviteData }) {
 
 function ShareCard({ invite }: { invite: InviteData }) {
   const [copied, setCopied] = useState(false);
-  const shareUrl = typeof window === "undefined" ? "" : window.location.href;
+  const [shareUrl, setShareUrl] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  useEffect(() => setShareUrl(window.location.href), []);
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl);
@@ -161,11 +164,9 @@ function ShareCard({ invite }: { invite: InviteData }) {
           <p className="share-hashtag">{invite.hashtag}</p>
           <div className="share-actions">
             <button className="share-action" type="button" onClick={copyLink}><Copy size={15} />{copied ? "Link copied" : "Copy invitation link"}</button>
-            <button className="share-action" type="button" onClick={() => {
-              if (navigator.share) void navigator.share({ title: `${invite.couple.bride} & ${invite.couple.groom}`, text: invite.couple.tagline, url: window.location.href });
-              else void copyLink();
-            }}><Share2 size={15} />Share invitation</button>
+            <button className="share-action share-action-primary" type="button" onClick={() => setModalOpen(true)}><Share2 size={15} />Send invite</button>
           </div>
+          <p className="share-preview"><strong>{invite.couple.bride} &amp; {invite.couple.groom}</strong><span>{invite.couple.tagline}</span><small>{shareUrl || "Your live invitation link"}</small></p>
           {invite.contacts.length > 0 && <div className="contact-list">{invite.contacts.filter((contact) => contact.phone).map((contact, index) => {
             const number = contact.phone.replace(/\D/g, "");
             return <span className="contact-link" key={`${contact.name}-${index}`}><span>{contact.name}</span><a className="contact-link" href={`tel:${contact.phone}`} aria-label={`Call ${contact.name}`}><Phone size={14} /></a><a className="contact-link" href={`https://wa.me/${number}`} target="_blank" rel="noreferrer" aria-label={`WhatsApp ${contact.name}`}><Share2 size={14} /></a></span>;
@@ -173,6 +174,22 @@ function ShareCard({ invite }: { invite: InviteData }) {
           {cleanNumber && <a className="share-action" href={`https://wa.me/${cleanNumber}`} target="_blank" rel="noreferrer" style={{ marginTop: 16, textDecoration: "none" }}>Get in touch on WhatsApp</a>}
         </div>
       </div>
+      {modalOpen && <div className="share-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setModalOpen(false); }}>
+        <div className="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-modal-title">
+          <button className="share-modal-close" type="button" onClick={() => setModalOpen(false)} aria-label="Close share invitation popup">×</button>
+          <p className="invite-eyebrow">Share the celebration</p>
+          <h3 id="share-modal-title">Send this invitation</h3>
+          <p className="share-modal-preview"><strong>{invite.couple.bride} &amp; {invite.couple.groom}</strong><span>{invite.couple.tagline}</span><small>{shareUrl || "Loading invitation link…"}</small></p>
+          {shareUrl && <QRCodeSVG value={shareUrl} size={164} level="Q" title="QR code for this invitation" />}
+          <div className="share-modal-actions">
+            <button className="share-action share-action-primary" type="button" onClick={() => {
+              if (navigator.share) void navigator.share({ title: `${invite.couple.bride} & ${invite.couple.groom}`, text: invite.couple.tagline, url: shareUrl });
+              else void copyLink();
+            }}><Share2 size={15} />Share now</button>
+            <button className="share-action" type="button" onClick={copyLink}><Copy size={15} />{copied ? "Link copied" : "Copy link"}</button>
+          </div>
+        </div>
+      </div>}
     </section>
   );
 }
@@ -185,12 +202,14 @@ function InviteFooter({ invite }: { invite: InviteData }) {
       <p className="footer-blessing">Your presence is our greatest blessing</p>
       <p className="footer-names">{invite.couple.bride} &amp; {invite.couple.groom}</p>
       <p className="invite-eyebrow" style={{ marginTop: 15 }}>{formatWeddingDate(invite.weddingDate)}</p>
+      <p className="footer-credit">Created with ❤️ by Aman Sagar</p>
     </footer>
   );
 }
 
 export function InviteRenderer({ invite, compact = false }: { invite: InviteData; compact?: boolean }) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const musicTimerRef = useRef<number | null>(null);
   const [musicOn, setMusicOn] = useState(false);
   const [musicStarted, setMusicStarted] = useState(false);
   const [introDismissed, setIntroDismissed] = useState(false);
@@ -202,14 +221,24 @@ export function InviteRenderer({ invite, compact = false }: { invite: InviteData
     if (!audio) return;
     if (musicOn) {
       audio.pause();
+      if (musicTimerRef.current) window.clearTimeout(musicTimerRef.current);
       setMusicOn(false);
     } else {
+      audio.currentTime = 0;
       void audio.play().then(() => {
         setMusicOn(true);
         setMusicStarted(true);
+        musicTimerRef.current = window.setTimeout(() => {
+          audio.pause();
+          setMusicOn(false);
+        }, 20_000);
       }).catch(() => setMusicOn(false));
     }
   };
+
+  useEffect(() => () => {
+    if (musicTimerRef.current) window.clearTimeout(musicTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (!compact && introDismissed) document.getElementById("hero")?.focus();
@@ -234,7 +263,7 @@ export function InviteRenderer({ invite, compact = false }: { invite: InviteData
       <div className="invite-sections" aria-hidden={!compact && !introDismissed} inert={!compact && !introDismissed}>
         {Array.from(new Set(invite.sectionOrder)).filter((id) => invite.sections[id] !== false && sections[id]).map((id) => <div key={id} style={invite.theme.sectionBackgrounds[id] ? { "--section-bg": backgroundValue(invite.theme.sectionBackgrounds[id]) } as CSSProperties : undefined}>{sections[id]}</div>)}
       </div>
-      {hasMusic && <><audio ref={audioRef} src={invite.musicUrl} loop preload="none" /><button className="music-toggle" onClick={toggleMusic} type="button" aria-label={musicOn ? "Pause wedding music" : "Play wedding music"}>{musicOn ? <Pause size={18} /> : <Music2 size={18} />}</button></>}
+      {hasMusic && <><audio ref={audioRef} src={invite.musicUrl} preload="metadata" onEnded={() => setMusicOn(false)} /><button className="music-toggle" onClick={toggleMusic} type="button" aria-label={musicOn ? "Pause wedding music" : "Play wedding music"}>{musicOn ? <Pause size={18} /> : <Music2 size={18} />}</button></>}
       {compact && <span className="sr-only">Live invitation preview</span>}
     </ThemeProvider>
   );

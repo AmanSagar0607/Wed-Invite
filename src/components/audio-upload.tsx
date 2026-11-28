@@ -34,7 +34,7 @@ export function AudioUpload({ value, onChange }: { value: string; onChange: (url
 
   return (
     <div className="field full">
-      <span className="field-label">Upload music (MP3, M4A, OGG, or WAV)</span>
+      <span className="field-label">Upload music (public invite plays the first 20 seconds)</span>
       <input ref={inputRef} type="file" accept="audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/wav,audio/x-wav" hidden onChange={(event) => void handleFile(event.target.files?.[0])} />
       <div className="inline-actions" style={{ marginTop: 0 }}>
         <button className="button-secondary" type="button" disabled={busy} onClick={() => inputRef.current?.click()}>{busy ? <LoaderCircle size={14} className="spin" /> : <Upload size={14} />}{busy ? "Uploading…" : "Choose audio"}</button>

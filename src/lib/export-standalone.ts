@@ -46,7 +46,7 @@ export function createStandaloneInviteHtml(invite: InviteData) {
     ${invite.sections.countdown !== false ? `<section class="section"><p class="eyebrow">The days are getting closer</p><h2>Counting down to forever</h2><div class="countdown" role="timer"><div><strong data-unit="days">00</strong><span>Days</span></div><div><strong data-unit="hours">00</strong><span>Hours</span></div><div><strong data-unit="minutes">00</strong><span>Minutes</span></div><div><strong data-unit="seconds">00</strong><span>Seconds</span></div></div></section>` : ""}
     ${invite.sections.events !== false && events ? `<section class="section"><p class="eyebrow">The celebration</p><h2>Join us for every moment</h2><div class="events">${events}</div></section>` : ""}
     ${invite.sections.gallery !== false && gallery ? `<section class="section"><p class="eyebrow">Little moments, big memories</p><h2>Our moments</h2><div class="gallery">${gallery}</div></section>` : ""}
-    <footer class="footer">Made with love for ${escapeHtml(names)}</footer>
+    <footer class="footer">Made with love for ${escapeHtml(names)}<br><small>Created with ❤️ by Aman Sagar</small></footer>
   </main>
   <script>
     const target = new Date(${targetDate}).getTime();
